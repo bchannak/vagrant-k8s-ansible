@@ -1,0 +1,1 @@
+kubeadm join 192.168.50.10:6443 --token fvp3pu.0x0d02v48f35xd4u --discovery-token-ca-cert-hash sha256:08e7749bc2fd455e1d877ba93c0bab97356cc9da289f3045e8cd4f9878b6f74e 
