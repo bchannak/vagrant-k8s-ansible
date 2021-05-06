@@ -1,6 +1,8 @@
 ---
 - hosts: all
   become: true
+  roles:
+    - common
   tasks:
     - name: Install packages that allow apt to be used over HTTPS
       apt:
@@ -14,6 +16,7 @@
         - curl
         - gnupg-agent
         - software-properties-common
+        - python3-pip
 
     - name: Add an apt signing key for Docker
       apt_key:
@@ -91,7 +94,7 @@
         state: restarted
 
     - name: Initialize the Kubernetes cluster using kubeadm
-      command: kubeadm init --apiserver-advertise-address="192.168.50.10" --apiserver-cert-extra-sans="192.168.50.10"  --node-name k8s-master --pod-network-cidr=192.168.0.0/16
+      command: kubeadm init --apiserver-advertise-address="{{ kube_vm_ipaddr }}" --apiserver-cert-extra-sans="{{ kube_vm_ipaddr }}"  --node-name k8s-master --pod-network-cidr={{ kube_pod_cidr }}
 
     - name: Create ~vagrant/.kube directory
       file: 
@@ -117,9 +120,10 @@
       command: kubeadm token create --print-join-command
       register: join_command
 
-    - name: Copy join command to local file
-      become: false
-      local_action: copy content="{{ join_command.stdout_lines[0] }}" dest="./join-command"
+    # Enable this for multi node kubernetes cluster
+    #- name: Copy join command to local file
+    #become: false
+    #local_action: copy content="{{ join_command.stdout_lines[0] }}" dest="./join-command"
 
     - name: Enable RPF check
       become: true
@@ -128,6 +132,22 @@
         value: '0'
         sysctl_set: yes
         state: present
+
+    - name: Get k8s config into a variable
+      slurp:
+        src: /home/vagrant/.kube/config
+      register: config
+
+    - set_fact:
+        config_data: "{{ config['content'] | b64decode }}"
+
+    - name: Copy config to local directory
+      become: false
+      local_action: copy content="{{ config_data }}" dest="./artifacts/config"
+
+    - name: Remove taint on master node (so pods can deploy)
+      become: false
+      command: kubectl taint node k8s-master node-role.kubernetes.io/master:NoSchedule-
 
   handlers:
     - name: docker status

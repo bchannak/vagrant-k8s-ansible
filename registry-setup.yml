@@ -1,0 +1,76 @@
+---
+# 
+# This playbook sets up a private registry to run on k8s-master vm.
+#
+# How to run:
+#  ansible-playbook -u vagrant -i .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory registry-setup.yml
+# 
+- hosts: all
+  roles:
+    - common
+  become: true
+  tasks:
+    - set_fact:
+        config_dir: "/tmp/artifacts"
+
+    - name: Create a directory for registry key & cert
+      file:
+        name: /mnt/registry/certs
+        state: directory
+
+    - name: Create a directory for registry data
+      file:
+        name: /mnt/registry/data
+        state: directory
+
+    - name: Create a private key
+      openssl_privatekey:
+        path: /mnt/registry/certs/registry.key
+        type: RSA
+        size: 4096
+
+    - name: Create a certificate signing request
+      openssl_csr:
+        privatekey_path: /mnt/registry/certs/registry.key
+        path: /mnt/registry/certs/registry.csr
+        country_name: US
+        organization_name: Personal
+        email_address: bchannak@gmail.com
+        common_name: k8s-master
+
+    - name: Generate a Self Signed OpenSSL certificate
+      openssl_certificate:
+        path: /mnt/registry/certs/registry.crt
+        privatekey_path: /mnt/registry/certs/registry.key
+        csr_path: /mnt/registry/certs/registry.csr
+        provider: selfsigned
+
+    # Openshift is a dependency for k8s module    
+    - name: Install openshift 
+      command: pip3 install openshift
+
+    - name: Ensure {{ config_dir }} is present
+      become: false
+      file:
+        name: "{{ config_dir }}"
+        state: directory
+
+    - name: Copy registry-deployment.yaml
+      become: false
+      template:
+        src: templates/registry-deployment.yaml
+        dest: "{{ config_dir }}/registry-deployment.yaml"
+
+    - name: Copy registry-service.yaml
+      become: false
+      template:
+        src: templates/registry-service.yaml
+        dest: "{{ config_dir }}/registry-service.yaml"
+
+    - name: Create a private-registry deployment
+      become: false
+      command: kubectl apply -f {{ config_dir }}/registry-deployment.yaml
+
+    - name: Create a private-registry service
+      become: false
+      command: kubectl apply -f {{ config_dir }}/registry-service.yaml

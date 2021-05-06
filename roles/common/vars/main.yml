@@ -1,0 +1,17 @@
+
+# This is the static ip address assigned to k8s-master vm
+# See Vagrantfile
+kube_vm_ipaddr: "192.168.50.10"
+
+# This is used to set  --pod-network-cidr
+kube_pod_cidr: "192.168.0.0/16"
+
+# The (private) registry service is exposed on {{ registry_nodeport }}
+# outside the cluster. To push development images to registry, you
+# need to do the following:
+#   docker tag nginx:latest k8s-master:{{ registry_nodeport }}/nginx:latest
+#   docker push k8s-master:{{ registry_nodeport }}/nginx:latest
+#
+#   where k8s-master is the name of development vm created using vagrant
+#   and added to /etc/hosts on the host (macos) 
+registry_nodeport: 31320
